@@ -5,6 +5,10 @@
 {                                                                           }
 {           https://github.com/kline777                                     }
 {                                                                           }
+{           Copyright (C) 2026 Eden5Wu                                      }
+{           Modified:                                                       }
+{           - Merged TDataSet structural management functions               }
+{                                                                           }
 {                                                                           }
 {***************************************************************************}
 {                                                                           }
@@ -360,6 +364,12 @@ type
     /// Returns current dataset row
     /// </summary>
     function Current: IDatasetRecord;
+
+    procedure AddAllFields();
+    procedure CreateNewField(AFieldName: string; AFieldType: TFieldType; ASize: Integer; ARequired: Boolean);
+    procedure CopyFieldStructure(Source: TDataSet);
+
+    function FieldExists(AFieldName: string): Boolean;
   end;
 
 implementation
@@ -1176,6 +1186,130 @@ begin
       for LIndex := 0 to Length(AValues) - 1 do
         FDataset.Fields[LIndex].Value := AValues[LIndex];
     end);
+end;
+
+procedure TDataSetHelper.AddAllFields;
+var
+   FieldsList: TList<string>;
+   FieldName: string;
+   Field: TField;
+   WasActive: boolean;
+   FieldDef: TFieldDef;
+   i: Integer;
+   DataSet: TDataSet;
+begin
+  // http://stackoverflow.com/questions/1188829/how-to-add-a-field-programatically-to-a-tadotable-in-delphi
+  // The method to start with is this one in DSDesign.pas: function TFieldsEditor.DoAddFields(All: Boolean): TField;
+  DataSet := Self;
+   WasActive := DataSet.Active;
+   if WasActive then
+      DataSet.Active := False;
+   try
+      FieldsList := TList<string>.Create;
+      try
+         DataSet.FieldDefs.Update;
+
+         // make a list of all the field names that aren't already on the DataSet
+         for i := 0 to DataSet.FieldDefList.Count - 1 do
+            with DataSet.FieldDefList[i] do
+               if (FieldClass <> nil) and not(faHiddenCol in Attributes) then
+               begin
+                  FieldName := DataSet.FieldDefList.Strings[i];
+                  Field := DataSet.FindField(FieldName);
+                  if (Field = nil) or (Field.Owner <> DataSet.Owner) then
+                     FieldsList.Add(FieldName);
+               end;
+
+         // add those fields to the dataset
+         for i := 0 to FieldsList.Count - 1 do
+         begin
+            FieldName := FieldsList[i];
+            FieldDef := DataSet.FieldDefList.FieldByName(FieldName);
+            Field := FieldDef.CreateField(DataSet.Owner, nil, FieldName, False);
+            try
+               Field.name := FieldName + IntToStr(Random(MaxInt)); // make the name unique
+            except
+               Field.Free;
+               raise ;
+            end;
+         end;
+      finally
+         FieldsList.Free;
+      end;
+   finally
+      if WasActive then
+         DataSet.Active := true;
+   end;
+end;
+
+procedure TDataSetHelper.CreateNewField(AFieldName: string; AFieldType: TFieldType;
+  ASize: Integer; ARequired: Boolean);
+var
+  LField: TField;
+begin
+  case AFieldType of
+    ftString:     LField := TStringField.Create(Self);
+    ftWideString: LField := TWideStringField.Create(Self);
+    ftSmallint:   LField := TSmallintField.Create(Self);
+    ftInteger:    LField := TIntegerField.Create(Self);
+    ftDate:       LField := TDateField.Create(Self);
+    ftDateTime:   LField := TDateTimeField.Create(Self);
+    ftTimeStamp:  LField := TSQLTimeStampField.Create(Self);
+    ftFloat:      LField := TFloatField.Create(Self);
+    ftBCD:        LField := TBCDField.Create(Self);
+    ftFMTBcd:     LField := TFMTBCDField.Create(Self);
+    ftBlob:       LField := TBlobField.Create(Self);
+    ftBoolean:    LField := TBooleanField.Create(Self);
+  else
+    LField := TField.Create(Self);
+  end;
+
+  if Assigned(LField) then
+  begin
+    LField.DataSet := Self;
+    LField.Name := AFieldName;
+    LField.FieldName := AFieldName;
+    LField.Required := ARequired;
+    LField.Size := ASize;
+  end;
+end;
+
+function TDataSetHelper.FieldExists(AFieldName: string): Boolean;
+begin
+  Result := Assigned(Self.FindField(AFieldName));
+end;
+
+procedure TDataSetHelper.CopyFieldStructure(Source: TDataSet);
+var
+  Field: TField;
+  NewField: TField;
+  FieldDef: TFieldDef;
+begin
+  Self.Fields.Clear;
+  Self.FieldDefs.Clear;
+
+  // Cannot perform the next operation on an opened dataset
+  if Self.State <> dsInactive then
+    Self.Close;
+
+  for Field in Source.Fields do
+  begin
+    // We are going to setup the first part in a FieldDef
+    // that will set us use the CreateField Call in order to
+    // get the correct subclass of TField created.
+    FieldDef := Self.FieldDefs.AddFieldDef;
+    FieldDef.DataType := Field.DataType;
+    FieldDef.Size := Field.Size;
+    FieldDef.Name := Field.FieldName;
+
+    NewField := FieldDef.CreateField(Self);
+    NewField.Visible := Field.Visible;
+    NewField.DisplayLabel := Field.DisplayLabel;
+    NewField.DisplayWidth := Field.DisplayWidth;
+    NewField.EditMask := Field.EditMask;
+    NewField.Calculated := Field.Calculated;
+    NewField.OnGetText := Field.OnGetText;
+  end;
 end;
 
 end.
