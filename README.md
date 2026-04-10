@@ -39,6 +39,14 @@ Functions to ease the looping of datasets, getting and setting data.
   <li>CREATECOPYROW (Creates new row in dataset with the same values of the current row (Allows Ignore fields) </li>
 </ul>
 
+**Structure Management Functions**
+<ul>
+  <li>ADDALLFIELDS (Add all persistent fields based on FieldDefs)</li>
+  <li>CREATENEWFIELD (Manually create a new field with specified type and size)</li>
+  <li>COPYFIELDSTRUCTURE (Copy the entire field structure from another dataset)</li>
+  <li>FIELDEXISTS (Check if a field name exists in the dataset)</li>
+</ul>
+
 <h2>Usage Examples</h2>
 <h4>Get total record count</h4>
 <p> totalCount:=myDataset.All.Count;</p> 
@@ -56,3 +64,18 @@ Functions to ease the looping of datasets, getting and setting data.
 <p> arr:=myDataset.Select('Category','Other').First.AsArray(['Name','Stock']);</p> 
 <h4>Copy first row with category 'Other' overriding ID with value 6</h4>
 <p> myDataset.Select('Category','Other').First.CreateCopyRecord(['ID'],[6]);</p> 
+
+#### Add all available fields to dataset
+<p> myDataset.AddAllFields;</p>
+
+#### Create a new string field manually
+<p> myDataset.CreateNewField('NewColumn', ftString, 50, False);</p>
+
+#### Copy structure from another dataset
+<p> myDataset.CopyFieldStructure(sourceDataset);</p>
+
+#### Check if field exists before processing
+<p> 
+  if myDataset.FieldExists('Status') then <br>
+    // Do something...
+</p>
